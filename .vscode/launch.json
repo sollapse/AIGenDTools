@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run RegEx Color Panel",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--disable-extensions",
+        "--extensionDevelopmentPath=${workspaceFolder}/regex-color-panel",
+        "${workspaceFolder}/regex-color-panel/examples",
+        "${workspaceFolder}/regex-color-panel/examples/alpha.css"
+      ]
+    },
+    {
+      "name": "Test RegEx Color Panel (with built-in CSS)",
+      "type": "extensionHost",
+      "request": "launch",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/regex-color-panel",
+        "--extensionTestsPath=${workspaceFolder}/regex-color-panel/test/color-provider.integration.js"
+      ]
+    }
+  ]
+}

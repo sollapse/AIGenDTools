@@ -14,11 +14,16 @@ function hex2(v) {
  *   'h' – hex digits (optionally 0x-prefixed)  → 0..255
  *   'd' – decimal integer 0-255               → 0..255
  *   'f' – float 0.0-1.0                        → 0..255
+ *   'p' – percentage 0-100                     → 0..255 (without byte rounding)
  */
 function parseChannelValue(str, type) {
+    if (type === 'p') {
+        const v = parseFloat(str);
+        return isNaN(v) ? null : Math.max(0, Math.min(100, v)) * 255 / 100;
+    }
     if (type === 'f') {
         const v = parseFloat(str);
-        return isNaN(v) ? null : Math.round(Math.max(0, Math.min(1, v)) * 255);
+        return isNaN(v) ? null : Math.max(0, Math.min(1, v)) * 255;
     }
     if (type === 'd') {
         const v = parseInt(str, 10);
@@ -33,7 +38,8 @@ function parseChannelValue(str, type) {
  * Extract { r, g, b, a } (each 0-255) from a regex match array.
  * channelOrder: e.g. "ARGB", "RGB"
  * channelTypes: optional string, same length as channelOrder.
- *   Each char is 'h' (hex), 'd' (decimal 0-255), or 'f' (float 0.0-1.0).
+ *   Each char is 'h' (hex), 'd' (decimal 0-255), 'f' (float 0.0-1.0),
+ *   or 'p' (percentage 0-100).
  *   Defaults to 'h' for any missing position.
  */
 function parseChannels(match, channelOrder, channelTypes) {
@@ -60,29 +66,127 @@ function parseChannels(match, channelOrder, channelTypes) {
  * Original text that uses only lowercase hex letters -> lowercase output.
  */
 function buildColorString(color, fmt, originalText) {
-    const r = Math.round(color.red   * 255);
-    const g = Math.round(color.green * 255);
-    const b = Math.round(color.blue  * 255);
-    const a = Math.round(color.alpha * 255);
-
     const hasLower = /[a-f]/.test(originalText);
     const hasUpper = /[A-F]/.test(originalText);
     const useLower = hasLower && !hasUpper;
-    const fh = v => { const s = hex2(v); return useLower ? s : s.toUpperCase(); };
-    const fd = v => String(Math.max(0, Math.min(255, Math.round(v))));
+    const fh = v => { const s = hex2(v * 255); return useLower ? s : s.toUpperCase(); };
+    const fd = v => String(Math.max(0, Math.min(255, Math.round(v * 255))));
     const ff = v => {
-        let s = (v / 255).toFixed(3).replace(/0+$/, '');
+        let s = v.toFixed(3).replace(/0+$/, '');
         if (s.endsWith('.')) s += '0';
         return s;
     };
 
-    const vals = { A: a, R: r, G: g, B: b };
-    return fmt.template.replace(/\{([ARGB])([hdf]?)\}/g, (_, ch, type) => {
-        const val = vals[ch] ?? 255;
+    const fp = v => String(Number((Math.max(0, Math.min(1, v)) * 100).toFixed(3)));
+    const vals = { A: color.alpha, R: color.red, G: color.green, B: color.blue };
+    return fmt.template.replace(/\{([ARGB])([hdfp]?)\}/g, (_, ch, type) => {
+        const val = vals[ch] ?? 1;
+        if (type === 'p') return fp(val);
         if (type === 'd') return fd(val);
         if (type === 'f') return ff(val);
         return fh(val);
     });
+}
+
+/** Find unique, simple custom-property definitions in the current document. */
+function getCssVariables(text) {
+    // Keep offsets intact while ignoring commented-out declarations.
+    const source = text.replace(/\/\*[\s\S]*?\*\//g, comment => comment.replace(/[^\r\n]/g, ' '));
+    const variables = new Map();
+    const regex = /(^|[;{])\s*(--[\w-]+)\s*:\s*([^;{}]*)(?=[;}])/gm;
+    let match;
+    while ((match = regex.exec(source)) !== null) {
+        const name = match[2];
+        const value = match[3].replace(/\s*!\s*important\s*$/i, '').trim();
+        const start = match.index + match[0].length - match[3].length + match[3].indexOf(value);
+        // Multiple definitions may belong to different selectors/themes. Do not guess.
+        const definition = value && text.slice(start, start + value.length) === value
+            ? { value, start, end: start + value.length }
+            : null;
+        variables.set(name, variables.has(name) ? null : definition);
+    }
+    return { source, variables };
+}
+
+/** Resolve rgb(var(--rgb) / var(--alpha)), including mixed literal/variable forms. */
+function getCssVariableColors(text, formats) {
+    const enabled = [];
+    for (const fmt of formats) {
+        if (!fmt.resolveCssVariables) continue;
+        try { enabled.push({ fmt, regex: new RegExp('^(?:' + fmt.pattern + ')$', 'i') }); }
+        catch { continue; }
+    }
+    if (enabled.length === 0) return [];
+
+    const { source, variables } = getCssVariables(text);
+    const variable = String.raw`var\(\s*--[\w-]+\s*\)`;
+    const rgb = String.raw`(?:${variable}|\d{1,3}\s+\d{1,3}\s+\d{1,3})`;
+    const alpha = String.raw`(?:${variable}|\d*\.?\d+\s*%?)`;
+    const regex = new RegExp(String.raw`\brgba?\(\s*(${rgb})\s*/\s*(${alpha})\s*\)`, 'gi');
+    const results = [];
+    let match;
+    while ((match = regex.exec(source)) !== null) {
+        const parts = [match[1], match[2]].map(value => {
+            const reference = /^var\(\s*(--[\w-]+)\s*\)$/i.exec(value);
+            const definition = reference ? variables.get(reference[1]) : null;
+            if (reference && !definition) return null;
+            return { text: value, definition, value: definition ? definition.value : value };
+        });
+        if (parts.some(part => !part) || !parts.some(part => part.definition)) continue;
+        const [rgbPart, alphaPart] = parts;
+        rgbPart.start = match[0].indexOf(rgbPart.text);
+        alphaPart.start = match[0].lastIndexOf(alphaPart.text);
+        const resolved = match[0].slice(0, match[0].indexOf('(') + 1)
+            + rgbPart.value + ' / ' + alphaPart.value + ')';
+        for (const { fmt, regex: pattern } of enabled) {
+            const resolvedMatch = pattern.exec(resolved);
+            if (!resolvedMatch) continue;
+            const channels = parseChannels(resolvedMatch, fmt.channels, fmt.channelTypes);
+            if (!channels) continue;
+            results.push({
+                start: match.index,
+                end: match.index + match[0].length,
+                fmt, channels, rgbPart, alphaPart,
+            });
+            break;
+        }
+    }
+    return results;
+}
+
+/** Update referenced definitions and keep var() expressions in the color literal. */
+function buildVariablePresentation(color, item, document, range, originalText) {
+    const { channels, rgbPart, alphaPart } = item;
+    const additionalTextEdits = [];
+    const literalEdits = [];
+    const update = (part, value) => {
+        if (part.definition) {
+            const { start, end } = part.definition;
+            additionalTextEdits.push(vscode.TextEdit.replace(
+                new vscode.Range(document.positionAt(start), document.positionAt(end)), value
+            ));
+        } else {
+            literalEdits.push({ start: part.start, end: part.start + part.text.length, value });
+        }
+    };
+    const changed = (next, previous) => Math.abs(next - previous / 255) > 1e-6;
+    if (changed(color.red, channels.r) || changed(color.green, channels.g) || changed(color.blue, channels.b)) {
+        update(rgbPart, buildColorString(color, { template: '{Rd} {Gd} {Bd}' }, originalText));
+    }
+    if (changed(color.alpha, channels.a)) {
+        // Alpha definitions use percentages; literal alpha keeps its existing unit.
+        const template = alphaPart.definition || alphaPart.text.includes('%') ? '{Ap}%' : '{Af}';
+        update(alphaPart, buildColorString(color, { template }, originalText));
+    }
+    let replacement = originalText;
+    for (const edit of literalEdits.sort((a, b) => b.start - a.start)) {
+        replacement = replacement.slice(0, edit.start) + edit.value + replacement.slice(edit.end);
+    }
+    const template = alphaPart.definition ? item.fmt.template.replace(/\{Af\}/g, '{Ap}%') : item.fmt.template;
+    const presentation = new vscode.ColorPresentation(buildColorString(color, { template }, originalText));
+    presentation.textEdit = vscode.TextEdit.replace(range, replacement);
+    presentation.additionalTextEdits = additionalTextEdits;
+    return presentation;
 }
 
 // ── color provider ────────────────────────────────────────────────────────────
@@ -124,6 +228,15 @@ class HexColorProvider {
             }
         }
 
+        for (const item of getCssVariableColors(text, formats)) {
+            const ch = item.channels;
+            raw.push({
+                start: item.start,
+                end: item.end,
+                color: new vscode.Color(ch.r / 255, ch.g / 255, ch.b / 255, ch.a / 255),
+            });
+        }
+
         // Longer match wins when two formats start at the same offset.
         raw.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
 
@@ -162,6 +275,15 @@ class HexColorProvider {
             }
         }
 
+        const variableColor = getCssVariableColors(document.getText(), formats).find(item =>
+            item.start === document.offsetAt(range.start) && item.end === document.offsetAt(range.end)
+        );
+        if (variableColor) {
+            return [buildVariablePresentation(color, variableColor, document, range, origText)];
+        }
+        // A variable reference that cannot be resolved safely must not be overwritten.
+        if (/\bvar\(/i.test(origText)) return [];
+
         // Fallback: standard uppercase #RRGGBB.
         return [new vscode.ColorPresentation(
             '#' +
@@ -177,7 +299,9 @@ class HexColorProvider {
 function activate(context) {
     context.subscriptions.push(
         vscode.languages.registerColorProvider(
-            [{ scheme: 'file' }, { scheme: 'untitled' }],
+            // VS Code collects color results in reverse selector-score order.
+            // A wildcard puts our format-preserving result before language providers.
+            { scheme: '*' },
             new HexColorProvider()
         )
     );

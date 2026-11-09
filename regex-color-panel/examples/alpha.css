@@ -1,0 +1,68 @@
+/*
+ * Open the repository root in VS Code and press F5.
+ * Hover a swatch in the Extension Development Host to open the picker.
+ * Change alpha to 25% and check the expected edits below.
+ * Undo each edit before moving to the next case.
+ */
+
+:root {
+  --inset-border-rgb: 37 99 235;
+  --inset-border-opacity: 0.1;
+}
+
+.literal-percent {
+  /* Expected: rgb(37 99 235 / 25%). */
+  --control-focus-shadow: 0 0 0 3px rgb(37 99 235 / 10%);
+}
+
+.comma-percent {
+  /* Expected: rgba(37, 99, 235, 25%). */
+  color: rgba(37, 99, 235, 10%);
+}
+
+.fractional-percent {
+  /* Keeping the same color must preserve 12.345%, without byte rounding. */
+  color: rgb(37 99 235 / 12.345%);
+}
+
+.float-alpha {
+  /* Expected: rgb(37 99 235 / 0.25), keeping decimal alpha. */
+  color: rgb(37 99 235 / 0.1);
+}
+
+.hex-rgba {
+  /* Expected at 25% alpha: #2563EB40. */
+  color: #2563EB80;
+}
+
+.variable-channels {
+  /*
+   * Alpha edit: update --inset-border-opacity above to 25%.
+   * RGB edit: update --inset-border-rgb above.
+   * Keep both var() references below intact.
+   */
+  border-color: rgb(var(--inset-border-rgb) / var(--inset-border-opacity));
+}
+
+.mixed-channels {
+  /* Alpha edits update its definition; RGB edits update the literal below. */
+  color: rgb(37 99 235 / var(--inset-border-opacity));
+}
+
+.missing-variable {
+  /* Expected: skip this expression; do not replace it with literal values. */
+  color: rgb(var(--missing-rgb) / var(--inset-border-opacity));
+}
+
+.theme-one {
+  --duplicate-opacity: 0.1;
+}
+
+.theme-two {
+  --duplicate-opacity: 0.2;
+}
+
+.ambiguous-variable {
+  /* Expected: skip because the alpha variable has multiple definitions. */
+  color: rgb(var(--inset-border-rgb) / var(--duplicate-opacity));
+}

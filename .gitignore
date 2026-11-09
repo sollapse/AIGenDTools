@@ -1,0 +1,72 @@
+# venv and IDE
+.venv/
+.idea/
+local_packages/
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea
+.DS_Store
+*:Zone.Identifier
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# cache
+__pycache__/
+
+#cprofiles
+*.prof
+
+# build and packages
+build/
+dist/
+
+frontend/package-lock.json
+node_modules/
+dist-ssr/
+frontend/*.local
+
+# local_files
+sketch.py
+
+*.ico
+
+# keys
+.env
+.env.local
+infra/.env.cloud
+
+#sketch
+草稿纸.*
+
+#Agents
+.continue/
+.aider.conf.yml
+.aider*
+.codex
+/Plans/
+.claude/settings.local.json
+.claude/.history*
+/.venv/
+/frontend/node_modules/
+/frontend/dist/
+frontend/.diagnostics/
+artifacts/
+
+# 运行时数据目录（设备配置 + sqlite 审计库），任何层级都不入库
+.cathode-hub/
+/.pytest_cache/
+/**/__pycache__/
+/build/
+/dist/
+/*.spec
+
+PHySpec.log
+
+# Office documents
+~$*.docx
+~$*.xlsx

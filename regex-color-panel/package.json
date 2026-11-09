@@ -18,7 +18,7 @@
       "properties": {
         "regexColorPanel.formats": {
           "type": "array",
-          "markdownDescription": "Color formats to recognize. Each entry specifies a regex `pattern` with one capture group per channel, a `channels` string mapping groups to `A`/`R`/`G`/`B`, an optional `channelTypes` string (`h`=hex, `d`=decimal 0-255, `f`=float 0.0-1.0), and a `template` that reconstructs the literal on color pick.\n\n**Example** \u2013 CSS rgba: `{ \"pattern\": \"rgba\\\\(\\\\s*(\\\\d{1,3})…\", \"channels\": \"RGBA\", \"channelTypes\": \"dddf\", \"template\": \"rgba({Rd}, {Gd}, {Bd}, {Af})\" }`",
+          "markdownDescription": "Color formats to recognize. Each entry specifies a regex `pattern` with one capture group per channel, a `channels` string mapping groups to `A`/`R`/`G`/`B`, an optional `channelTypes` string (`h`=hex, `d`=decimal 0-255, `f`=float 0.0-1.0, `p`=percentage 0-100), and a `template` that reconstructs the literal on color pick.\n\n**Example** \u2013 CSS rgba: `{ \"pattern\": \"rgba\\\\(\\\\s*(\\\\d{1,3})…\", \"channels\": \"RGBA\", \"channelTypes\": \"dddf\", \"template\": \"rgba({Rd}, {Gd}, {Bd}, {Af})\" }`",
           "items": {
             "type": "object",
             "required": ["pattern", "channels", "template"],
@@ -29,7 +29,7 @@
               },
               "pattern": {
                 "type": "string",
-                "description": "Regex string. Each capture group must capture exactly 2 hex digits for one channel."
+                "description": "Regex string. Each capture group captures one channel value in the corresponding channelTypes format."
               },
               "channels": {
                 "type": "string",
@@ -37,11 +37,15 @@
               },
               "channelTypes": {
                 "type": "string",
-                "description": "Value type per capture group — same length as 'channels'. Each char: 'h' = hex 2-digit (default), 'd' = decimal 0-255, 'f' = float 0.0-1.0. E.g. \"ddd\" for rgb(), \"dddf\" for rgba()."
+                "description": "Value type per capture group — same length as 'channels'. Each char: 'h' = hex 2-digit (default), 'd' = decimal 0-255, 'f' = float 0.0-1.0, 'p' = percentage 0-100 (capture the number without the % sign). E.g. \"ddd\" for rgb(), \"dddf\" for rgba()."
               },
               "template": {
                 "type": "string",
-                "description": "Output template when the user picks a new color. {X} or {Xh} = hex, {Xd} = decimal (0-255), {Xf} = float (0.0-1.0), where X is A, R, G, or B. E.g. \"0x{A}{R}{G}{B}\", \"rgb({Rd}, {Gd}, {Bd})\", \"rgba({Rd}, {Gd}, {Bd}, {Af})\"."
+                "description": "Output template when the user picks a new color. {X} or {Xh} = hex, {Xd} = decimal (0-255), {Xf} = float (0.0-1.0), {Xp} = percentage (0-100, up to 3 decimal places; add a literal % in the template if needed), where X is A, R, G, or B. E.g. \"0x{A}{R}{G}{B}\", \"rgb({Rd}, {Gd}, {Bd})\", \"rgba({Rd}, {Gd}, {Bd}, {Af})\"."
+              },
+              "resolveCssVariables": {
+                "type": "boolean",
+                "description": "Resolve simple var() references in space-separated CSS rgb()/rgba() with slash alpha. Definitions must be unique and in the current document. Color picks update definitions and preserve references; missing or ambiguous definitions are skipped."
               },
               "languages": {
                 "type": "array",
@@ -100,6 +104,32 @@
               "channels": "RGBA",
               "channelTypes": "dddf",
               "template": "rgba({Rd}, {Gd}, {Bd}, {Af})",
+              "languages": ["css", "scss", "less", "html", "javascript", "typescript", "javascriptreact", "typescriptreact"]
+            },
+            {
+              "name": "CSS rgba(r, g, b, a%)",
+              "pattern": "rgba\\(\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d{1,3})\\s*,\\s*(\\d*\\.?\\d+)\\s*%\\s*\\)",
+              "channels": "RGBA",
+              "channelTypes": "dddp",
+              "template": "rgba({Rd}, {Gd}, {Bd}, {Ap}%)",
+              "languages": ["css", "scss", "less", "html", "javascript", "typescript", "javascriptreact", "typescriptreact"]
+            },
+            {
+              "name": "CSS rgb(r g b / a)",
+              "pattern": "\\brgba?\\(\\s*(\\d{1,3})\\s+(\\d{1,3})\\s+(\\d{1,3})\\s*/\\s*(\\d*\\.?\\d+)\\s*\\)",
+              "channels": "RGBA",
+              "channelTypes": "dddf",
+              "template": "rgb({Rd} {Gd} {Bd} / {Af})",
+              "resolveCssVariables": true,
+              "languages": ["css", "scss", "less", "html", "javascript", "typescript", "javascriptreact", "typescriptreact"]
+            },
+            {
+              "name": "CSS rgb(r g b / a%)",
+              "pattern": "\\brgba?\\(\\s*(\\d{1,3})\\s+(\\d{1,3})\\s+(\\d{1,3})\\s*/\\s*(\\d*\\.?\\d+)\\s*%\\s*\\)",
+              "channels": "RGBA",
+              "channelTypes": "dddp",
+              "template": "rgb({Rd} {Gd} {Bd} / {Ap}%)",
+              "resolveCssVariables": true,
               "languages": ["css", "scss", "less", "html", "javascript", "typescript", "javascriptreact", "typescriptreact"]
             }
           ]
