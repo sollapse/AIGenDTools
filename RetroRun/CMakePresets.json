@@ -1,0 +1,55 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 21, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "vs2022",
+      "inherits": "base",
+      "displayName": "Visual Studio 2022 (MSVC, x64)",
+      "description": "A Visual Studio solution, built with MSVC; CMake finds Visual Studio itself.",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64"
+    },
+    {
+      "name": "mingw",
+      "inherits": "base",
+      "displayName": "MinGW-w64 (GCC)",
+      "description": "The MinGW-w64 g++ found on PATH, 64- or 32-bit as it targets.",
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "g++" }
+    },
+    {
+      "name": "clang",
+      "inherits": "base",
+      "displayName": "Clang (clang++)",
+      "description": "The clang++ found on PATH, for the MSVC or the MinGW-w64 ABI as it targets.",
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "clang++" }
+    },
+    {
+      "name": "clang-cl",
+      "inherits": "base",
+      "displayName": "Clang (clang-cl)",
+      "description": "The clang-cl found on PATH, from a Visual Studio developer prompt.",
+      "generator": "Ninja Multi-Config",
+      "cacheVariables": { "CMAKE_CXX_COMPILER": "clang-cl" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "vs2022", "configurePreset": "vs2022", "configuration": "Release" },
+    { "name": "mingw", "configurePreset": "mingw", "configuration": "Release" },
+    { "name": "clang", "configurePreset": "clang", "configuration": "Release" },
+    { "name": "clang-cl", "configurePreset": "clang-cl", "configuration": "Release" }
+  ],
+  "testPresets": [
+    { "name": "vs2022", "configurePreset": "vs2022", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "mingw", "configurePreset": "mingw", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "clang", "configurePreset": "clang", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "clang-cl", "configurePreset": "clang-cl", "configuration": "Release", "output": { "outputOnFailure": true } }
+  ]
+}
